@@ -1,0 +1,140 @@
+#!/usr/bin/python2
+
+# Copyright (C) Asher Blum 2018
+
+import sys
+
+NOTES = 'c#d#ef#g#a#b'
+
+class Chord(object):
+  def __init__(self, s):
+    self.minor = s.endswith('-')
+    if self.minor:
+      s = s[:-1]
+    s = s.lower()
+    flatsharp = 0
+    if s.endswith('#'):
+      flatsharp = 1
+    elif s.endswith('b'):
+      flatsharp = -1
+    if flatsharp:
+      s = s[:-1]
+
+    i = NOTES.index(s)
+    i += flatsharp
+    i = i % len(NOTES)
+    self.ind = i
+
+  def __repr__(self):
+    rv = NOTES[self.ind].upper()
+    if rv == '#':
+      rv = NOTES[self.ind + 1].upper() + 'b'
+    if self.minor:
+      rv += '-'
+    return rv
+
+  def chord_to_nashville_number(self, nchord):
+    '''I am tonic; given nchord, return its functional notation str;
+       If I am 'C' then G=5, Gb=5b, G-=5-'''
+    offsets = [i for i, v in enumerate(NOTES) if v != '#'] # 0 2 4 5 etc = cdef...
+    degrees = [(i+self.ind)%len(NOTES) for i in offsets]
+    flat = False
+
+    # print "degrees=%r, nchord.ind=%r" % (degrees, nchord.ind)
+    if nchord.ind in degrees:
+      nn = degrees.index(nchord.ind) + 1
+    elif (nchord.ind + 1)%12 in degrees:
+      nn = degrees.index((nchord.ind+1)%12) + 1
+      flat = True
+    else: # impossible
+      return 'x'
+    rv = str(nn)
+    if flat:
+      rv += 'b'
+    if nchord.minor:
+      rv += '-'
+    return rv
+
+########################################################################
+
+def progression_badness(prog):
+  """['1', '2', '5', '6-'] -> 5; score how unlikely a progression is"""
+  chromatic_minors = [c for c in prog if c[-1] == '-' and c[0] in '145']
+  chromatic_majors = [c for c in prog if c[-1] != '-' and c[0] in '236']
+  flats = [c for c in prog if 'b' in c and c[0] != '7'] # 7b is OK
+
+  dom = 4 if '5' in prog else 0 # reward for dominant chord
+  return len(chromatic_minors) + len(chromatic_majors) + len(flats) - dom
+
+def fmt_prog(prog):
+  '''Format a progression as a string'''
+  fmts = ['%-4.4s' for i in prog]
+  fmt = '  '.join(fmts)
+  return fmt % tuple(prog)
+
+def die(msg):
+    sys.stderr.write(msg + "\n")
+    sys.exit(-1)
+
+def die_if(pred, msg):
+  if pred:
+    die(msg)
+
+def mk_chord_or_die(chord_s):
+  try:
+    return Chord(chord_s)
+  except:
+    die("Invalid chord: %r - should be like D, Db, D-, Db-, etc." % chord_s)
+    
+def main(schords):
+  die_if(len(schords) < 2, "I need at least two chords")
+  chords = [mk_chord_or_die(s) for s in schords]
+  tonics = sorted(set(schords)) # use each only once
+  hh = 'KEY    ' + fmt_prog(chords)
+  print hh
+  print '-' * len(hh)
+  progs = []
+  for tonic_s in tonics:
+    tonic = Chord(tonic_s)
+    nums = [tonic.chord_to_nashville_number(c) for c in chords]
+    badness = progression_badness(nums)
+    progs.append((badness, tonic, fmt_prog(nums)))
+  progs.sort()
+  for bad, tonic, ns in progs:
+    print "%-5.5s  %s" % (tonic, ns)
+
+########################################################################
+
+def test1():
+  # chords = 'Ab Bb Eb F-'.split() # oh lamour
+  chords = 'Ab Bb B Db Eb Gb'.split() # sometimes
+  res = main(chords)
+
+def test2():
+  chords = 'C F G Bb D-'.split()
+  print chords
+  tonic = Chord('C')
+  nums = [tonic.chord_to_nashville_number(Chord(x)) for x in chords]
+  print nums
+
+  tonic = Chord('G')
+  nums = [tonic.chord_to_nashville_number(Chord(x)) for x in chords]
+  print nums
+
+def test3():
+  tonic = Chord('Ab')
+  rv = tonic.chord_to_nashville_number(Chord('B'))
+  print rv
+
+def test_if_wanted(args):
+  if len(args) < 1 or not args[0].startswith('test'):
+    return
+  globals()[args[0]]()
+  sys.exit(0)
+
+########################################################################
+
+if __name__ == '__main__':
+  test_if_wanted(sys.argv[1:])
+  schords = sys.argv[1:]
+  main(schords)
