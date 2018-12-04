@@ -1,0 +1,69 @@
+#!/usr/bin/python2
+
+# Copyright (C) Asher Blum 2018
+#
+# Script to print a transposition map. This lets you transpose from
+# a specific musical key into C major.
+#
+# Invoke script with number of flats/sharps, e.g. '3b' or '2#' ...
+#
+# nsharp is a signed integer; if negative, it is number of flats
+
+import sys
+
+
+def usage(err=None):
+  if err:
+    print "ERROR: %s" % err
+
+  print "\nUsage examples:\n"
+  print "    %s 3b      Convert from a key signature with 3 flats" % sys.argv[0]
+  print "    %s 2#      Convert from a key signature with 2 sharps" % sys.argv[0]
+  sys.exit(1)
+
+def get_nth_note(i):
+  aa = 'CDEFGAB'
+  return aa[i % len(aa)]
+
+def parse_arg(arg):
+  '''Convert various key signatures to int nsharp'''
+  if len(arg) != 2:
+    return None
+  if arg[1] not in '#b':
+    return None
+  sgn = 1 if arg[1] == '#' else -1
+  return sgn * int(arg[0])
+
+def get_key(nsharp):
+  '''0->C, 1->G etc.'''
+  if nsharp == 6:
+    return 'F#'
+  note = get_nth_note(nsharp*4)
+  if nsharp < -1:
+    note += 'b' # flat
+  return note
+
+def get_clef_notes(nsharp=0):
+  '''Return downward labels: 5 treb staff + 1 ledger + 5 bass'''
+  nn = range(-10, 11, 2)
+  notes = [get_nth_note(n+3*nsharp) for n in nn]
+  return ''.join(reversed(notes))
+
+def print_both_clefs(nsharp=1):
+  notes = get_clef_notes(nsharp)
+  key = get_key(nsharp)
+  print "\nKey: %s\n" % key
+  for i, n in enumerate(notes):
+    sym = '    -' if i == 5 else '-----' # ledger between treb and bass
+    print "%s %s" % (n, sym)
+
+def main():
+  if len(sys.argv) < 2:
+    usage()
+  nsharp = parse_arg(sys.argv[1])
+  if nsharp is None:
+    usage("Invalid argument")
+  print_both_clefs(nsharp)
+
+if __name__ == '__main__':
+  main()
